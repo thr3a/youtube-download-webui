@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>YouTube Download WebUI</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>Youtube Download WebUI</h1>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="panel">
+      <div class="row">
+        <input id="url" type="text" placeholder="動画のURLを入力 (https://...)" />
+        <div class="radios">
+          <label><input type="radio" name="download_type" value="video" checked> 動画</label>
+          <label><input type="radio" name="download_type" value="audio"> 音声のみ</label>
+        </div>
+        <button id="startBtn" class="primary">開始</button>
+      </div>
+      <div id="formError" class="help err" style="display:none;"></div>
+      <div class="help">プレイリストURLは未対応 / 1並列ダウンロード。履歴はSQLite(./webui.db)に保存されます。</div>
+    </section>
+
+    <section class="panel history">
+      <table>
+        <thead>
+          <tr>
+            <th class="nowrap">ステータス</th>
+            <th>タイトル</th>
+            <th class="nowrap">形式</th>
+            <th class="nowrap">サイズ</th>
+            <th class="nowrap">進捗</th>
+            <th>エラー</th>
+            <th class="nowrap">操作</th>
+          </tr>
+        </thead>
+        <tbody id="historyBody">
+          <!-- rows -->
+        </tbody>
+      </table>
+    </section>
+    <div class="footer-space"></div>
+  </main>
+
+  <script src="{{ url_for('static', path='main.js') }}"></script>
+</body>
+</html>
