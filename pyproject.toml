@@ -1,0 +1,12 @@
+[project]
+name = "fastapi-template"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi[all]>=0.115.6",
+    "pytest>=8.4.1",
+    "ruff>=0.8.4",
+    "yt-dlp>=2025.8.11",
+]
