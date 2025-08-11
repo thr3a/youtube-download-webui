@@ -8,10 +8,23 @@ function fmtBytes(bytes) {
   return (bytes / Math.pow(1024, i)).toFixed(1) + " " + units[i];
 }
 
-function statusClass(s) {
-  return ["queued", "downloading", "completed", "error", "canceled"].includes(s)
-    ? s
-    : "";
+function statusBadgeClass(s) {
+  const base =
+    "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold";
+  switch (s) {
+    case "queued":
+      return base + " bg-gray-100 text-gray-700";
+    case "downloading":
+      return base + " bg-blue-100 text-blue-800";
+    case "completed":
+      return base + " bg-green-100 text-green-700";
+    case "error":
+      return base + " bg-red-100 text-red-700";
+    case "canceled":
+      return base + " bg-amber-100 text-amber-700";
+    default:
+      return base + " bg-gray-100 text-gray-700";
+  }
 }
 
 function escapeHtml(s) {
@@ -31,29 +44,27 @@ function renderRows(items) {
       const size = fmtBytes(Number(item.file_size || 0));
       const title = item.title
         ? escapeHtml(item.title)
-        : "<span class='muted'>(未取得)</span>";
+        : '<span class="text-gray-500">(未取得)</span>';
       const err = item.error_message
-        ? "<div class='err'>" + escapeHtml(item.error_message) + "</div>"
+        ? '<div class="text-red-700">' + escapeHtml(item.error_message) + "</div>"
         : "";
       const canSave = item.status === "completed" && item.file_path;
       const canRetry = item.status !== "downloading";
       return `
           <tr data-id="${item.id}">
-            <td><span class="status ${statusClass(item.status)}">${escapeHtml(item.status)}</span></td>
-            <td class="title-cell">${title}<div class="muted" style="font-size:12px;">${escapeHtml(item.url)}</div></td>
-            <td class="nowrap">${escapeHtml(item.download_type)}</td>
-            <td class="nowrap">${size}</td>
-            <td class="nowrap">
-              <div class="progress" title="${prog}%"><span style="width:${prog}%"></span></div>
+            <td><span class="${statusBadgeClass(item.status)}">${escapeHtml(item.status)}</span></td>
+            <td class="title-cell">${title}<div class="text-xs text-gray-500">${escapeHtml(item.url)}</div></td>
+            <td class="whitespace-nowrap">${escapeHtml(item.download_type)}</td>
+            <td class="whitespace-nowrap">${size}</td>
+            <td class="whitespace-nowrap">
+              <div class="w-32 h-2 bg-gray-200 rounded-md overflow-hidden" title="${prog}%">
+                <span class="block h-full bg-blue-500 transition-all" style="width:${prog}%"></span>
+              </div>
             </td>
             <td>${err}</td>
-            <td class="nowrap">
-              <button class="btn btn-save" ${canSave ? "" : "disabled"} title="${
-        canSave ? "保存" : "ダウンロード未完了"
-      }">保存</button>
-              <button class="btn btn-retry" ${canRetry ? "" : "disabled"} title="${
-        canRetry ? "再試行" : "ダウンロード中は不可"
-      }">再試行</button>
+            <td class="whitespace-nowrap">
+              <button class="btn btn-save inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md border border-green-300 text-green-700 bg-green-50 hover:bg-green-100 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed" ${canSave ? "" : "disabled"} title="${canSave ? "保存" : "ダウンロード未完了"}">保存</button>
+              <button class="btn btn-retry inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md border border-blue-300 text-blue-800 bg-blue-50 hover:bg-blue-100 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed" ${canRetry ? "" : "disabled"} title="${canRetry ? "再試行" : "ダウンロード中は不可"}">再試行</button>
             </td>
           </tr>
         `;
@@ -150,4 +161,4 @@ $("#startBtn").addEventListener("click", async () => {
 
 // 初期表示とポーリング（進捗や状態の自動更新のため）
 fetchHistory();
-setInterval(fetchHistory, 5000);
+setInterval(fetchHistory, 2000);
