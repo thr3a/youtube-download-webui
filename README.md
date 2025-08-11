@@ -1,6 +1,7 @@
 youtubeなどの動画URLを入れるとyt-dlpがダウンロードしてくれるサイトを作りたい
 サーバーはuv run uvicorn app.main:app --reload --host 0.0.0.0 --port 3000で開発中は起動する
-まずはHTMLのフロントエンドとDB登録のAPIまで実装してください。実際の動画ダウンロードは実装後に再度依頼します。
+HTMLのフロントエンドとDB登録のAPIまで実装した。
+実際の動画ダウンロード部分をfastapiのBackgroundTasksを使用して実装してください。
 
 要件
 
