@@ -36,9 +36,9 @@ function renderRows(items) {
         ? "<div class='err'>" + escapeHtml(item.error_message) + "</div>"
         : "";
       const canSave = item.status === "completed" && item.file_path;
-      const canRetry = item.status === "error" || item.status === "canceled";
+      const canRetry = item.status !== "downloading";
       return `
-          <tr>
+          <tr data-id="${item.id}">
             <td><span class="status ${statusClass(item.status)}">${escapeHtml(item.status)}</span></td>
             <td class="title-cell">${title}<div class="muted" style="font-size:12px;">${escapeHtml(item.url)}</div></td>
             <td class="nowrap">${escapeHtml(item.download_type)}</td>
@@ -48,11 +48,11 @@ function renderRows(items) {
             </td>
             <td>${err}</td>
             <td class="nowrap">
-              <button class="btn" ${canSave ? "" : "disabled"} title="${
+              <button class="btn btn-save" ${canSave ? "" : "disabled"} title="${
         canSave ? "保存" : "ダウンロード未完了"
       }">保存</button>
-              <button class="btn" ${canRetry ? "" : "disabled"} title="${
-        canRetry ? "再試行" : "エラー/キャンセル時のみ"
+              <button class="btn btn-retry" ${canRetry ? "" : "disabled"} title="${
+        canRetry ? "再試行" : "ダウンロード中は不可"
       }">再試行</button>
             </td>
           </tr>
@@ -94,6 +94,37 @@ async function registerDownload(url, download_type) {
     errBox.style.display = "block";
   }
 }
+
+async function retryDownload(id) {
+  try {
+    const res = await fetch(`/api/downloads/${id}/retry`, { method: "POST" });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(
+        body.detail ?? "再試行に失敗しました (HTTP " + res.status + ")",
+      );
+    }
+    await fetchHistory();
+  } catch (e) {
+    alert(e.message || String(e));
+  }
+}
+
+document.getElementById("historyBody").addEventListener("click", async (e) => {
+  const btn = e.target.closest("button");
+  if (!btn) return;
+  const tr = btn.closest("tr");
+  if (!tr) return;
+  const id = Number(tr.dataset.id);
+  if (btn.classList.contains("btn-retry")) {
+    btn.disabled = true;
+    try {
+      await retryDownload(id);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+});
 
 function currentType() {
   const r = $$('input[name="download_type"]').find((x) => x.checked);

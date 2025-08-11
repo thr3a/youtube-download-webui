@@ -80,7 +80,9 @@ def _row_to_dict(row: Any) -> Dict[str, Any]:
     }
 
 
-def _run_download_task(download_id: int, url: str, download_type: str) -> None:
+def _run_download_task(
+    download_id: int, url: str, download_type: str, force_redownload: bool = False
+) -> None:
     """Background download task serialized to run 1 at a time.
 
     - ステータス/進捗/サイズ/ファイルパス/エラーをDBに反映
@@ -110,8 +112,8 @@ def _run_download_task(download_id: int, url: str, download_type: str) -> None:
                 "noplaylist": True,
                 "quiet": True,
                 "no_warnings": True,
-                "restrictfilenames": True,
-                "overwrites": False,
+                # "restrictfilenames": True,
+                "overwrites": bool(force_redownload),
                 "cachedir": False,
                 "outtmpl": str(DOWNLOADS_DIR / "%(title)s [%(id)s].%(ext)s"),
                 "format": "best",
@@ -130,17 +132,24 @@ def _run_download_task(download_id: int, url: str, download_type: str) -> None:
                     )
                 expected_path = Path(ydl_probe.prepare_filename(info_probe))
 
-            # 既にファイルが存在する場合はスキップしてcompleted
+            # 既にファイルが存在する場合の挙動
             if expected_path.exists():
-                try:
-                    size = expected_path.stat().st_size
-                except OSError:
-                    size = 0
-                _update_sql(
-                    "UPDATE downloads SET status = 'completed', file_path = ?, file_size = ?, progress = 100, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                    (str(expected_path), int(size), download_id),
-                )
-                return
+                if not force_redownload:
+                    try:
+                        size = expected_path.stat().st_size
+                    except OSError:
+                        size = 0
+                    _update_sql(
+                        "UPDATE downloads SET status = 'completed', file_path = ?, file_size = ?, progress = 100, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                        (str(expected_path), int(size), download_id),
+                    )
+                    return
+                else:
+                    # 再試行(強制)時は既存ファイルを削除して最初からやり直す
+                    try:
+                        expected_path.unlink()
+                    except OSError:
+                        pass
 
             # 進捗フック
             def _hook(d: Dict[str, Any]) -> None:
@@ -225,6 +234,63 @@ def get_download(download_id: int) -> Dict[str, Any]:
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
     return _row_to_dict(row)
+
+
+@router.post("/{download_id}/retry", response_model=Dict[str, Any])
+def retry_download(
+    download_id: int, background_tasks: BackgroundTasks
+) -> Dict[str, Any]:
+    """ダウンロードの再試行（最初からやり直す）。
+
+    - ダウンロード中以外の全ステータスで実行可能（completedも可）
+    - 進捗/ファイル情報/エラー/タイトルを初期化しqueueへ戻す
+    - 実行はバックグラウンドでforce_redownload=Trueとして再実行
+    """
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM downloads WHERE id = ?",
+            (download_id,),
+        ).fetchone()
+
+        if not row:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Not found"
+            )
+
+        if row["status"] == "downloading":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="ダウンロード中は再試行できません。",
+            )
+
+        # 状態を初期化してキューへ戻す（最初から）
+        conn.execute(
+            """
+            UPDATE downloads
+               SET status = 'queued',
+                   progress = 0,
+                   file_size = 0,
+                   file_path = NULL,
+                   error_message = NULL,
+                   title = NULL,
+                   updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?
+            """,
+            (download_id,),
+        )
+        conn.commit()
+
+        # バックグラウンド実行（強制再ダウンロード）
+        background_tasks.add_task(
+            _run_download_task, download_id, row["url"], row["download_type"], True
+        )
+
+        row2 = conn.execute(
+            "SELECT * FROM downloads WHERE id = ?",
+            (download_id,),
+        ).fetchone()
+
+    return _row_to_dict(row2)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=Dict[str, Any])
