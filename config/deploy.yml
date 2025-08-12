@@ -64,9 +64,11 @@ ssh:
   # proxy_command: /tmp/cloudflared access ssh --id a01e19ab8d887fda817582956d1cc1e9.access --secret CF_TOKEN --hostname %h
 # Use a persistent storage volume.
 #
-# volumes:
-#   - "app_storage:/app/storage"
-
+volumes:
+  - "webui.db:/app/webui.db"
+  - "webui.db-shm:/app/webui.db-shm"
+  - "webui.db-wal:/app/webui.db-wal"
+  - "downloads:/app/downloads"
 # Bridge fingerprinted assets, like JS and CSS, between versions to avoid
 # hitting 404 on in-flight requests. Combines all files from new and old
 # version inside the asset_path.
