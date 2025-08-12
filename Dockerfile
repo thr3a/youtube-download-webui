@@ -1,6 +1,19 @@
 # ref: https://github.com/astral-sh/uv-fastapi-example/blob/main/Dockerfile
 FROM python:3.12-slim-bullseye
 
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Tokyo
+ENV PYTHONUNBUFFERED=1
+ENV PIP_NO_CACHE_DIR=on
+ENV PYTHONDONTWRITEBYTECODE=1
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl ffmpeg ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+RUN pip install "yt-dlp[default,curl-cffi] @ https://github.com/yt-dlp/yt-dlp/archive/master.tar.gz"
+
+COPY yt-dlp.conf /etc/yt-dlp.conf
+
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
 COPY . /app
