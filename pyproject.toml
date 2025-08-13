@@ -1,5 +1,5 @@
 [project]
-name = "fastapi-template"
+name = "youtube-download-webui"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -9,5 +9,8 @@ dependencies = [
     "jinja2>=3.1.6",
     "pytest>=8.4.1",
     "ruff>=0.8.4",
-    "yt-dlp>=2025.8.11",
+    "yt-dlp[curl-cffi,default]",
 ]
+
+[tool.uv.sources]
+yt-dlp = { url = "https://github.com/yt-dlp/yt-dlp/archive/master.tar.gz" }

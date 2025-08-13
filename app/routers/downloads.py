@@ -116,8 +116,18 @@ def _run_download_task(
                 "overwrites": bool(force_redownload),
                 "cachedir": False,
                 "outtmpl": str(DOWNLOADS_DIR / "%(title)s [%(id)s].%(ext)s"),
-                "format": "best",
             }
+            if download_type == "audio":
+                base_opts["format"] = "bestaudio/best"
+                base_opts["postprocessors"] = [
+                    {
+                        "key": "FFmpegExtractAudio",
+                        "preferredcodec": "mp3",
+                        "preferredquality": "320",
+                    }
+                ]
+            else:
+                base_opts["format"] = "best"
 
             # メタ情報と期待されるファイル名を先に取得
             with YoutubeDL(base_opts) as ydl_probe:
