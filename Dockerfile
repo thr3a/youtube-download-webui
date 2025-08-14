@@ -1,3 +1,4 @@
+# ref: https://docs.astral.sh/uv/guides/integration/docker/
 # ref: https://github.com/astral-sh/uv-fastapi-example/blob/main/Dockerfile
 FROM python:3.12-slim-bullseye
 
@@ -12,13 +13,20 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 RUN pip install "yt-dlp[default,curl-cffi] @ https://github.com/yt-dlp/yt-dlp/archive/master.tar.gz"
 
-COPY yt-dlp.conf /etc/yt-dlp.conf
-
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+
+WORKDIR /app
+
+# Install dependencies
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --locked --no-install-project
 
 COPY . /app
 
-WORKDIR /app
-RUN uv sync --frozen --no-cache
+# Sync the project
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked
 
 CMD ["/app/.venv/bin/fastapi", "run", "app/main.py", "--port", "3000"]
