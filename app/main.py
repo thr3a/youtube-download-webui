@@ -8,7 +8,6 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .db import init_db
-from .routers import items
 from .routers.downloads import router as downloads_router
 
 
@@ -25,8 +24,6 @@ app = FastAPI(lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
-# 既存のサンプルルーター（必要なら残す）
-app.include_router(items.router)
 # 実装したDownloads API
 app.include_router(downloads_router)
 

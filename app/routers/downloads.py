@@ -9,9 +9,10 @@ Provides endpoints for:
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, quote
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, status
+from fastapi.responses import StreamingResponse
 
 from app.db import DOWNLOADS_DIR, get_connection
 
@@ -115,7 +116,10 @@ def _run_download_task(
                 # "restrictfilenames": True,
                 "overwrites": bool(force_redownload),
                 "cachedir": False,
-                "outtmpl": str(DOWNLOADS_DIR / "%(title)s [%(id)s].%(ext)s"),
+                "no_mtime": True,
+                "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
+                "outtmpl": str(DOWNLOADS_DIR / "%(title).150B [%(id)s].%(ext)s"),
+                "add_header": ["Accept-Language: ja-JP"],
             }
             if download_type == "audio":
                 base_opts["format"] = "bestaudio/best"
@@ -126,8 +130,6 @@ def _run_download_task(
                         "preferredquality": "320",
                     }
                 ]
-            else:
-                base_opts["format"] = "best"
 
             # メタ情報と期待されるファイル名を先に取得
             with YoutubeDL(base_opts) as ydl_probe:
@@ -191,9 +193,10 @@ def _run_download_task(
                             size = os.path.getsize(filename)
                         except OSError:
                             size = 0
+                        # ファイルパスは最後にexpected_pathで上書きするので、ここではサイズと進捗のみ更新
                         _update_sql(
-                            "UPDATE downloads SET file_path = ?, file_size = ?, progress = 100, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                            (str(filename), int(size), download_id),
+                            "UPDATE downloads SET file_size = ?, progress = 100, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                            (int(size), download_id),
                         )
 
             run_opts = dict(base_opts)
@@ -204,7 +207,7 @@ def _run_download_task(
                 ydl_run.extract_info(url, download=True)
 
             # 完了（冪等に最終反映）
-            path_str = str(last_filename) if last_filename else str(expected_path)
+            path_str = str(expected_path)
             try:
                 size = os.path.getsize(path_str)
             except OSError:
@@ -244,6 +247,51 @@ def get_download(download_id: int) -> Dict[str, Any]:
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
     return _row_to_dict(row)
+
+
+def _file_iterator(file_path: str, chunk_size: int = 8192):
+    """ファイルをチャンク単位で読み込むジェネレータ関数。"""
+    with open(file_path, "rb") as file:
+        while chunk := file.read(chunk_size):
+            yield chunk
+
+
+@router.get("/{download_id}/download")
+def download_file(download_id: int) -> StreamingResponse:
+    """指定されたIDのダウンロード済みファイルをクライアントに送信する。"""
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM downloads WHERE id = ?",
+            (download_id,),
+        ).fetchone()
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+
+    if row["status"] != "completed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ダウンロードが完了していません。",
+        )
+
+    file_path = row["file_path"]
+    print(file_path)
+    if not file_path or not os.path.exists(file_path):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="ファイルが見つかりません。",
+        )
+
+    filename = os.path.basename(file_path)
+    encoded_filename = quote(filename)
+    headers = {
+        "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}",
+        "Content-Type": "application/octet-stream",
+    }
+
+    return StreamingResponse(
+        _file_iterator(file_path),
+        headers=headers,
+    )
 
 
 @router.post("/{download_id}/retry", response_model=Dict[str, Any])

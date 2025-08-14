@@ -134,6 +134,15 @@ document.getElementById("historyBody").addEventListener("click", async (e) => {
     } finally {
       btn.disabled = false;
     }
+  } else if (btn.classList.contains("btn-save")) {
+    // 保存ボタンがクリックされたときの処理
+    try {
+      // 新しいタブでダウンロードリンクを開く
+      window.open(`/api/downloads/${id}/download`, "_blank");
+    } catch (error) {
+      console.error("保存に失敗しました:", error);
+      alert("保存に失敗しました。");
+    }
   }
 });
 
