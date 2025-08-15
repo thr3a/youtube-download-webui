@@ -234,6 +234,7 @@ def _run_download_task(
                         )
 
             run_opts = dict(base_opts)
+            print(run_opts)
             run_opts["progress_hooks"] = [_hook]
 
             # 実ダウンロード
