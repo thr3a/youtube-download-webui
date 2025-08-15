@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS downloads (
     progress INTEGER NOT NULL DEFAULT 0,
     file_path TEXT,
     error_message TEXT,
+    yt_dlp_params TEXT,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -58,5 +59,13 @@ def init_db() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
     with get_connection() as conn:
+        # テーブル作成
         conn.executescript(SCHEMA_SQL)
+
+        # マイグレーション: yt_dlp_params カラムの追加
+        cursor = conn.execute("PRAGMA table_info(downloads)")
+        columns = [row["name"] for row in cursor.fetchall()]
+        if "yt_dlp_params" not in columns:
+            conn.execute("ALTER TABLE downloads ADD COLUMN yt_dlp_params TEXT")
+
         conn.commit()

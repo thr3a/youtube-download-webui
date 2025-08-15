@@ -50,6 +50,11 @@ function renderRows(items) {
         : "";
       const canSave = item.status === "completed" && item.file_path;
       const canRetry = item.status !== "downloading";
+      const retryTitle = item.yt_dlp_params
+        ? escapeHtml(item.yt_dlp_params)
+        : canRetry
+          ? "再試行"
+          : "ダウンロード中は不可";
       return `
           <tr data-id="${item.id}">
             <td><span class="${statusBadgeClass(item.status)}">${escapeHtml(item.status)}</span></td>
@@ -64,7 +69,7 @@ function renderRows(items) {
             <td>${err}</td>
             <td class="whitespace-nowrap">
               <button class="btn btn-save inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md border border-green-300 text-green-700 bg-green-50 hover:bg-green-100 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed" ${canSave ? "" : "disabled"} title="${canSave ? "保存" : "ダウンロード未完了"}">保存</button>
-              <button class="btn btn-retry inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md border border-blue-300 text-blue-800 bg-blue-50 hover:bg-blue-100 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed" ${canRetry ? "" : "disabled"} title="${canRetry ? "再試行" : "ダウンロード中は不可"}">再試行</button>
+              <button class="btn btn-retry inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md border border-blue-300 text-blue-800 bg-blue-50 hover:bg-blue-100 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed" ${canRetry ? "" : "disabled"} title="${retryTitle}">再試行</button>
             </td>
           </tr>
         `;
@@ -83,7 +88,7 @@ async function fetchHistory() {
   }
 }
 
-async function registerDownload(url, download_type) {
+async function registerDownload(url, download_type, yt_dlp_params) {
   const errBox = $("#formError");
   errBox.style.display = "none";
   errBox.textContent = "";
@@ -91,7 +96,7 @@ async function registerDownload(url, download_type) {
     const res = await fetch("/api/downloads", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url, download_type }),
+      body: JSON.stringify({ url, download_type, yt_dlp_params }),
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
@@ -159,10 +164,12 @@ $("#startBtn").addEventListener("click", async () => {
     errBox.style.display = "block";
     return;
   }
+  const ytDlpParams = $("#ytDlpParams").value.trim();
   $("#startBtn").disabled = true;
   try {
-    await registerDownload(url, currentType());
+    await registerDownload(url, currentType(), ytDlpParams);
     $("#url").value = "";
+    $("#ytDlpParams").value = "";
   } finally {
     $("#startBtn").disabled = false;
   }

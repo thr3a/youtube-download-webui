@@ -55,6 +55,8 @@ def _validate_url(url: str) -> None:
 
 
 def _row_to_dict(row: Any) -> Dict[str, Any]:
+    # sqlite3.Rowはdict-likeだがdictではないので、キーの存在チェックが必要
+    keys = row.keys()
     return {
         "id": row["id"],
         "url": row["url"],
@@ -65,13 +67,18 @@ def _row_to_dict(row: Any) -> Dict[str, Any]:
         "progress": row["progress"],
         "file_path": row["file_path"],
         "error_message": row["error_message"],
+        "yt_dlp_params": row["yt_dlp_params"] if "yt_dlp_params" in keys else None,
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
     }
 
 
 def _run_download_task(
-    download_id: int, url: str, download_type: str, force_redownload: bool = False
+    download_id: int,
+    url: str,
+    download_type: str,
+    force_redownload: bool = False,
+    yt_dlp_params: str | None = None,
 ) -> None:
     """Background download task serialized to run 1 at a time.
 
@@ -119,6 +126,44 @@ def _run_download_task(
                         "preferredquality": "320",
                     }
                 ]
+
+            # ユーザー指定の追加パラメータを反映
+            if yt_dlp_params:
+                import shlex
+
+                try:
+                    extra_args = shlex.split(yt_dlp_params)
+                except ValueError as e:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail=f"追加パラメータの解析に失敗しました: {e}",
+                    )
+
+                # YoutubeDLのCLIオプションをPython APIのパラメータに変換
+                # 既知のオプションは直接マッピングし、それ以外はpostprocessor_argsやhttp_headersなどに振り分け
+                # ここでは簡易的に--key value形式や--flag形式をdictに追加
+                i = 0
+                while i < len(extra_args):
+                    arg = extra_args[i]
+                    if arg.startswith("--"):
+                        key = arg[2:].replace("-", "_")
+                        # 値を伴うオプション
+                        if i + 1 < len(extra_args) and not extra_args[i + 1].startswith(
+                            "--"
+                        ):
+                            val = extra_args[i + 1]
+                            # 特殊処理: add_headerはリストで
+                            if key == "add_header":
+                                base_opts.setdefault("add_header", []).append(val)
+                            else:
+                                base_opts[key] = val
+                            i += 2
+                        else:
+                            # フラグ型
+                            base_opts[key] = True
+                            i += 1
+                    else:
+                        i += 1
 
             # メタ情報と期待されるファイル名を先に取得
             with YoutubeDL(base_opts) as ydl_probe:

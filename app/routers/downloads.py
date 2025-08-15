@@ -37,6 +37,7 @@ class DownloadItem(BaseModel):
     file_path: str | None = None
     error_message: str | None = None
     title: str | None = None
+    yt_dlp_params: str | None = None
 
     model_config = {
         "json_schema_extra": {
@@ -51,6 +52,7 @@ class DownloadItem(BaseModel):
                     "file_path": "/path/to/file.mp4",
                     "error_message": None,
                     "title": "Example Video",
+                    "yt_dlp_params": "--write-thumbnail",
                 }
             ]
         }
@@ -73,10 +75,17 @@ class ErrorResponse(BaseModel):
 class CreateDownloadRequest(BaseModel):
     url: str = Field(..., description="ダウンロード対象のURL")
     download_type: str = Field(..., description="ダウンロード種別 (video または audio)")
+    yt_dlp_params: str | None = Field(None, description="yt-dlpに追加で渡すパラメータ")
 
     model_config = {
         "json_schema_extra": {
-            "examples": [{"url": "https://example.com/video", "download_type": "video"}]
+            "examples": [
+                {
+                    "url": "https://example.com/video",
+                    "download_type": "video",
+                    "yt_dlp_params": "--write-thumbnail",
+                }
+            ]
         }
     }
 
@@ -244,7 +253,12 @@ def retry_download(
 
         # バックグラウンド実行（強制再ダウンロード）
         background_tasks.add_task(
-            _run_download_task, download_id, row["url"], row["download_type"], True
+            _run_download_task,
+            download_id,
+            row["url"],
+            row["download_type"],
+            True,
+            row["yt_dlp_params"],
         )
 
         row2 = conn.execute(
@@ -274,11 +288,13 @@ def create_download(
     Body:
       {
         "url": "https://...",
-        "download_type": "video" | "audio"
+        "download_type": "video" | "audio",
+        "yt_dlp_params": "--write-thumbnail"
       }
     """
     url: Optional[str] = payload.url
     download_type: Optional[str] = payload.download_type
+    yt_dlp_params: Optional[str] = payload.yt_dlp_params
 
     if not url or not isinstance(url, str):
         raise HTTPException(
@@ -297,10 +313,10 @@ def create_download(
     with get_connection() as conn:
         cur = conn.execute(
             """
-            INSERT INTO downloads (url, download_type, status)
-            VALUES (?, ?, 'queued')
+            INSERT INTO downloads (url, download_type, status, yt_dlp_params)
+            VALUES (?, ?, 'queued', ?)
             """,
-            (url, download_type),
+            (url, download_type, yt_dlp_params),
         )
         new_id = cur.lastrowid
         conn.commit()
@@ -311,6 +327,8 @@ def create_download(
         ).fetchone()
 
     # バックグラウンドで実処理をキュー（ロックにより1並列実行）
-    background_tasks.add_task(_run_download_task, new_id, url, download_type)
+    background_tasks.add_task(
+        _run_download_task, new_id, url, download_type, False, yt_dlp_params
+    )
 
     return _row_to_dict(row)
