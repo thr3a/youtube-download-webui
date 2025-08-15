@@ -1,0 +1,7 @@
+# 結局このファイルは不要(httpsにしたので
+[registry."dockerhub.local.turai.work:9490"]
+http = true
+insecure = true
+
+# docker buildx create --name kamal-local-docker-container --config ./buildkitd.toml --use
+# docker buildx rm kamal-local-docker-container
