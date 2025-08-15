@@ -55,3 +55,12 @@ CREATE TABLE IF NOT EXISTS downloads (
 - アプリケーション再起動時の挙動
   - もし動画のダウンロード中にアプリケーションを停止・再起動したらstatus が downloading のまま止まってしまう
   - 不整合を防ぐために起動時に status が downloading のレコードを探して、それを error に更新する
+
+```
+【重要】
+コードの更新、コマンド実行の前に、これから実行しようとしている処理内容を説明してから、実行します。
+
+APIの可読性と保守性を向上させることを目指します。
+app/routers/downloads.pyでmemo.mdを参考に
+OpenAPI (Swagger UI) で表示されるための詳細なドキュメンテーションを追加してください。
+```

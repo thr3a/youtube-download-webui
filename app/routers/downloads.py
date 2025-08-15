@@ -8,6 +8,8 @@ Provides endpoints for:
 
 from __future__ import annotations
 
+
+from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote
 
@@ -24,10 +26,74 @@ from app.routers.utils import (
 
 import os
 
+
+class DownloadItem(BaseModel):
+    id: int
+    url: str
+    download_type: str
+    status: str
+    progress: int
+    file_size: int | None = None
+    file_path: str | None = None
+    error_message: str | None = None
+    title: str | None = None
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "id": 1,
+                    "url": "https://example.com/video",
+                    "download_type": "video",
+                    "status": "completed",
+                    "progress": 100,
+                    "file_size": 1048576,
+                    "file_path": "/path/to/file.mp4",
+                    "error_message": None,
+                    "title": "Example Video",
+                }
+            ]
+        }
+    }
+
+
+class ErrorResponse(BaseModel):
+    detail: str
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {"detail": "Not found"},
+                {"detail": "ダウンロード中は再試行できません。"},
+            ]
+        }
+    }
+
+
+class CreateDownloadRequest(BaseModel):
+    url: str = Field(..., description="ダウンロード対象のURL")
+    download_type: str = Field(..., description="ダウンロード種別 (video または audio)")
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [{"url": "https://example.com/video", "download_type": "video"}]
+        }
+    }
+
+
 router = APIRouter(prefix="/api/downloads", tags=["downloads"])
 
 
-@router.get("", response_model=List[Dict[str, Any]])
+@router.get(
+    "",
+    summary="ダウンロード履歴一覧取得",
+    description="登録済みのダウンロード履歴を新しい順に返します。",
+    response_model=List[DownloadItem],
+    response_description="ダウンロード履歴のリスト",
+    responses={
+        200: {"description": "成功時", "model": List[DownloadItem]},
+    },
+)
 def list_downloads() -> List[Dict[str, Any]]:
     """履歴一覧を新しい順で返す。"""
     with get_connection() as conn:
@@ -37,7 +103,16 @@ def list_downloads() -> List[Dict[str, Any]]:
     return [_row_to_dict(r) for r in rows]
 
 
-@router.get("/{download_id}", response_model=Dict[str, Any])
+@router.get(
+    "/{download_id}",
+    summary="ダウンロード詳細取得",
+    description="指定されたIDのダウンロード情報を返します。",
+    response_model=DownloadItem,
+    responses={
+        200: {"description": "成功時", "model": DownloadItem},
+        404: {"description": "指定されたIDが存在しない場合", "model": ErrorResponse},
+    },
+)
 def get_download(download_id: int) -> Dict[str, Any]:
     """単一エントリ取得。"""
     with get_connection() as conn:
@@ -57,7 +132,22 @@ def _file_iterator(file_path: str, chunk_size: int = 8192):
             yield chunk
 
 
-@router.get("/{download_id}/download")
+@router.get(
+    "/{download_id}/download",
+    summary="ダウンロードファイル取得",
+    description="指定されたIDのダウンロード済みファイルを返します。`status` が `completed` の場合のみ取得可能です。",
+    responses={
+        200: {"description": "ファイルストリームを返します"},
+        400: {
+            "description": "ダウンロードが完了していない場合",
+            "model": ErrorResponse,
+        },
+        404: {
+            "description": "ファイルまたはIDが存在しない場合",
+            "model": ErrorResponse,
+        },
+    },
+)
 def download_file(download_id: int) -> StreamingResponse:
     """指定されたIDのダウンロード済みファイルをクライアントに送信する。"""
     with get_connection() as conn:
@@ -95,7 +185,20 @@ def download_file(download_id: int) -> StreamingResponse:
     )
 
 
-@router.post("/{download_id}/retry", response_model=Dict[str, Any])
+@router.post(
+    "/{download_id}/retry",
+    summary="ダウンロード再試行",
+    description="指定されたIDのダウンロードを最初から再試行します。`downloading` 状態以外で実行可能です。",
+    response_model=DownloadItem,
+    responses={
+        200: {"description": "再試行開始後のダウンロード情報", "model": DownloadItem},
+        404: {"description": "指定されたIDが存在しない場合", "model": ErrorResponse},
+        409: {
+            "description": "ダウンロード中は再試行できません",
+            "model": ErrorResponse,
+        },
+    },
+)
 def retry_download(
     download_id: int, background_tasks: BackgroundTasks
 ) -> Dict[str, Any]:
@@ -152,9 +255,19 @@ def retry_download(
     return _row_to_dict(row2)
 
 
-@router.post("", status_code=status.HTTP_201_CREATED, response_model=Dict[str, Any])
+@router.post(
+    "",
+    summary="新規ダウンロード登録",
+    description="新しいダウンロードを登録し、バックグラウンドで実行を開始します。",
+    status_code=status.HTTP_201_CREATED,
+    response_model=DownloadItem,
+    responses={
+        201: {"description": "登録成功時のダウンロード情報", "model": DownloadItem},
+        422: {"description": "入力値が不正な場合", "model": ErrorResponse},
+    },
+)
 def create_download(
-    payload: Dict[str, Any], background_tasks: BackgroundTasks
+    payload: CreateDownloadRequest, background_tasks: BackgroundTasks
 ) -> Dict[str, Any]:
     """新規ダウンロードの登録（DBにqueuedで作成）し、バックグラウンドで実行を開始する。
 
@@ -164,8 +277,8 @@ def create_download(
         "download_type": "video" | "audio"
       }
     """
-    url: Optional[str] = payload.get("url")
-    download_type: Optional[str] = payload.get("download_type")
+    url: Optional[str] = payload.url
+    download_type: Optional[str] = payload.download_type
 
     if not url or not isinstance(url, str):
         raise HTTPException(
