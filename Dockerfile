@@ -1,6 +1,6 @@
 # ref: https://docs.astral.sh/uv/guides/integration/docker/
 # ref: https://github.com/astral-sh/uv-fastapi-example/blob/main/Dockerfile
-FROM python:3.12-slim-bullseye
+FROM python:3.13-slim-bullseye
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Tokyo
