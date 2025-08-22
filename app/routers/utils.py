@@ -5,10 +5,13 @@ from pathlib import Path
 from threading import Lock
 from typing import Any, Dict, Optional
 from urllib.parse import urlparse, parse_qs
+import shlex
 
 from fastapi import HTTPException, status
+from yt_dlp import YoutubeDL
 
 from app.db import DOWNLOADS_DIR, get_connection
+from app.cli_to_api import cli_to_api
 
 
 # 1 並列制御用のロック（同時に1つだけ実行）
@@ -86,9 +89,6 @@ def _run_download_task(
     - 既存ファイルがある場合はスキップしてcompletedにする
     - プレイリストは事前バリデーションで弾かれている想定
     """
-    # 遅延インポート（起動を軽くする）
-    from yt_dlp import YoutubeDL
-
     last_filename: Optional[str] = None
 
     def _update_sql(query: str, params: tuple[Any, ...]) -> None:
@@ -105,10 +105,10 @@ def _run_download_task(
         )
         try:
             # 共通オプション
-            base_opts: Dict[str, Any] = {
+            default_opts: Dict[str, Any] = {
                 "noplaylist": True,
-                "quiet": True,
-                "no_warnings": True,
+                "quiet": False,
+                "no_warnings": False,
                 # "restrictfilenames": True,
                 "overwrites": bool(force_redownload),
                 "cachedir": False,
@@ -118,8 +118,8 @@ def _run_download_task(
                 "add_header": ["Accept-Language: ja-JP"],
             }
             if download_type == "audio":
-                base_opts["format"] = "bestaudio/best"
-                base_opts["postprocessors"] = [
+                default_opts["format"] = "bestaudio/best"
+                default_opts["postprocessors"] = [
                     {
                         "key": "FFmpegExtractAudio",
                         "preferredcodec": "mp3",
@@ -128,45 +128,23 @@ def _run_download_task(
                 ]
 
             # ユーザー指定の追加パラメータを反映
+            user_opts: Dict[str, Any] = {}
             if yt_dlp_params:
-                import shlex
-
                 try:
                     extra_args = shlex.split(yt_dlp_params)
+                    user_opts = cli_to_api(extra_args)
                 except ValueError as e:
                     raise HTTPException(
                         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                         detail=f"追加パラメータの解析に失敗しました: {e}",
                     )
 
-                # YoutubeDLのCLIオプションをPython APIのパラメータに変換
-                # 既知のオプションは直接マッピングし、それ以外はpostprocessor_argsやhttp_headersなどに振り分け
-                # ここでは簡易的に--key value形式や--flag形式をdictに追加
-                i = 0
-                while i < len(extra_args):
-                    arg = extra_args[i]
-                    if arg.startswith("--"):
-                        key = arg[2:].replace("-", "_")
-                        # 値を伴うオプション
-                        if i + 1 < len(extra_args) and not extra_args[i + 1].startswith(
-                            "--"
-                        ):
-                            val = extra_args[i + 1]
-                            # 特殊処理: add_headerはリストで
-                            if key == "add_header":
-                                base_opts.setdefault("add_header", []).append(val)
-                            else:
-                                base_opts[key] = val
-                            i += 2
-                        else:
-                            # フラグ型
-                            base_opts[key] = True
-                            i += 1
-                    else:
-                        i += 1
+            # デフォルトオプションとユーザー指定オプションをマージ
+            download_opts = dict(default_opts)
+            download_opts.update(user_opts)
 
             # メタ情報と期待されるファイル名を先に取得
-            with YoutubeDL(base_opts) as ydl_probe:
+            with YoutubeDL(download_opts) as ydl_probe:
                 info_probe = ydl_probe.extract_info(url, download=False)
                 title = (
                     info_probe.get("title") if isinstance(info_probe, dict) else None
@@ -233,8 +211,7 @@ def _run_download_task(
                             (int(size), download_id),
                         )
 
-            run_opts = dict(base_opts)
-            print(run_opts)
+            run_opts = dict(download_opts)
             run_opts["progress_hooks"] = [_hook]
 
             # 実ダウンロード

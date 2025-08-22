@@ -1121,9 +1121,9 @@ requires-dist = [
 
 [[package]]
 name = "yt-dlp"
-version = "2025.8.11"
+version = "2025.8.20"
 source = { url = "https://github.com/yt-dlp/yt-dlp/archive/master.tar.gz" }
-sdist = { hash = "sha256:5d307e7fbbb2f65c4a5be08211186a76747a6825e3795d5c93ab58433c7e0c0f" }
+sdist = { hash = "sha256:2765a9925691275a1741fd043eea58b521f4d8c2826893427e3af75c90be47a7" }
 
 [package.optional-dependencies]
 curl-cffi = [
