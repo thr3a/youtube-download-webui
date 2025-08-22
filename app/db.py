@@ -9,7 +9,6 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-
 ROOT_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT_DIR / "data"
 DB_PATH = DATA_DIR / "webui.db"
@@ -21,7 +20,7 @@ CREATE TABLE IF NOT EXISTS downloads (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     url TEXT NOT NULL,
     title TEXT,
-    -- ステータス：キュー登録(queued), ダウンロード中(downloading), 完了(completed), エラー(error), キャンセル(canceled)
+    -- ステータス：キュー登録(queued), ダウンロード中(downloading), 完了(completed), エラー(error),キャンセル(canceled)
     status TEXT NOT NULL CHECK(status IN ('queued', 'downloading', 'completed', 'error', 'canceled')) DEFAULT 'queued',
     -- 保存形式：動画(video), 音声(audio)
     download_type TEXT NOT NULL CHECK(download_type IN ('video', 'audio')),
@@ -54,7 +53,7 @@ def get_connection() -> sqlite3.Connection:
     return conn
 
 
-def init_db() -> None:
+async def init_db() -> None:  # noqa: RUF029
     """Initialize the database schema if it does not exist."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)

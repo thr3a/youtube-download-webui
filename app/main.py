@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -12,9 +13,9 @@ from .routers.downloads import router as downloads_router
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI):
+async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
     """アプリ起動時にDBと保存先ディレクトリを初期化する。"""
-    init_db()
+    await init_db()
     yield
 
 

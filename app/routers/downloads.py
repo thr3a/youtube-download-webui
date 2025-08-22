@@ -1,30 +1,20 @@
-"""Downloads API router.
-
-Provides endpoints for:
-- POST /api/downloads: 登録（DBにqueuedで作成）
-- GET  /api/downloads: 履歴一覧取得
-- GET  /api/downloads/{id}: 詳細取得
-"""
-
 from __future__ import annotations
 
-
-from pydantic import BaseModel, Field
-from typing import Any, Dict, List, Optional
+import pathlib
+from typing import Any
 from urllib.parse import quote
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 
 from app.db import get_connection
 from app.routers.utils import (
     _row_to_dict,
-    _validate_url,
-    _validate_download_type,
     _run_download_task,
+    _validate_download_type,
+    _validate_url,
 )
-
-import os
 
 
 class DownloadItem(BaseModel):
@@ -97,13 +87,13 @@ router = APIRouter(prefix="/api/downloads", tags=["downloads"])
     "",
     summary="ダウンロード履歴一覧取得",
     description="登録済みのダウンロード履歴を新しい順に返します。",
-    response_model=List[DownloadItem],
+    response_model=list[DownloadItem],
     response_description="ダウンロード履歴のリスト",
     responses={
-        200: {"description": "成功時", "model": List[DownloadItem]},
+        200: {"description": "成功時", "model": list[DownloadItem]},
     },
 )
-def list_downloads() -> List[Dict[str, Any]]:
+def list_downloads() -> list[dict[str, Any]]:
     """履歴一覧を新しい順で返す。"""
     with get_connection() as conn:
         rows = conn.execute(
@@ -122,7 +112,7 @@ def list_downloads() -> List[Dict[str, Any]]:
         404: {"description": "指定されたIDが存在しない場合", "model": ErrorResponse},
     },
 )
-def get_download(download_id: int) -> Dict[str, Any]:
+def get_download(download_id: int) -> dict[str, Any]:
     """単一エントリ取得。"""
     with get_connection() as conn:
         row = conn.execute(
@@ -134,7 +124,7 @@ def get_download(download_id: int) -> Dict[str, Any]:
     return _row_to_dict(row)
 
 
-def _file_iterator(file_path: str, chunk_size: int = 8192):
+def _file_iterator(file_path: str, chunk_size: int = 8192) -> iter[bytes]:
     """ファイルをチャンク単位で読み込むジェネレータ関数。"""
     with open(file_path, "rb") as file:
         while chunk := file.read(chunk_size):
@@ -175,13 +165,13 @@ def download_file(download_id: int) -> StreamingResponse:
 
     file_path = row["file_path"]
     print(file_path)
-    if not file_path or not os.path.exists(file_path):
+    if not file_path or not pathlib.Path(file_path).exists():
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="ファイルが見つかりません。",
         )
 
-    filename = os.path.basename(file_path)
+    filename = pathlib.Path(file_path).name
     encoded_filename = quote(filename)
     headers = {
         "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}",
@@ -208,9 +198,7 @@ def download_file(download_id: int) -> StreamingResponse:
         },
     },
 )
-def retry_download(
-    download_id: int, background_tasks: BackgroundTasks
-) -> Dict[str, Any]:
+def retry_download(download_id: int, background_tasks: BackgroundTasks) -> dict[str, Any]:
     """ダウンロードの再試行（最初からやり直す）。
 
     - ダウンロード中以外の全ステータスで実行可能（completedも可）
@@ -224,9 +212,7 @@ def retry_download(
         ).fetchone()
 
         if not row:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Not found"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
 
         if row["status"] == "downloading":
             raise HTTPException(
@@ -280,9 +266,7 @@ def retry_download(
         422: {"description": "入力値が不正な場合", "model": ErrorResponse},
     },
 )
-def create_download(
-    payload: CreateDownloadRequest, background_tasks: BackgroundTasks
-) -> Dict[str, Any]:
+def create_download(payload: CreateDownloadRequest, background_tasks: BackgroundTasks) -> dict[str, Any]:
     """新規ダウンロードの登録（DBにqueuedで作成）し、バックグラウンドで実行を開始する。
 
     Body:
@@ -292,9 +276,9 @@ def create_download(
         "yt_dlp_params": "--write-thumbnail"
       }
     """
-    url: Optional[str] = payload.url
-    download_type: Optional[str] = payload.download_type
-    yt_dlp_params: Optional[str] = payload.yt_dlp_params
+    url: str | None = payload.url
+    download_type: str | None = payload.download_type
+    yt_dlp_params: str | None = payload.yt_dlp_params
 
     if not url or not isinstance(url, str):
         raise HTTPException(
@@ -327,8 +311,6 @@ def create_download(
         ).fetchone()
 
     # バックグラウンドで実処理をキュー（ロックにより1並列実行）
-    background_tasks.add_task(
-        _run_download_task, new_id, url, download_type, False, yt_dlp_params
-    )
+    background_tasks.add_task(_run_download_task, new_id, url, download_type, False, yt_dlp_params)
 
     return _row_to_dict(row)

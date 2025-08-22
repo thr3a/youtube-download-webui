@@ -1,20 +1,18 @@
 from __future__ import annotations
 
-import os
+import shlex
 from pathlib import Path
 from threading import Lock
-from typing import Any, Dict, Optional
-from urllib.parse import urlparse, parse_qs
-import shlex
+from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 from fastapi import HTTPException, status
 from yt_dlp import YoutubeDL
 
-from app.db import DOWNLOADS_DIR, get_connection
 from app.cli_to_api import cli_to_api
+from app.db import DOWNLOADS_DIR, get_connection
 
-
-# 1 並列制御用のロック（同時に1つだけ実行）
+# 並列制御用のロック（同時に1つだけ実行）
 _DOWNLOAD_LOCK = Lock()
 
 
@@ -28,11 +26,9 @@ def _is_playlist_url(url: str) -> bool:
     except Exception:
         return False
     qs = parse_qs(parsed.query)
-    if "list" in qs and qs["list"]:
+    if qs.get("list"):
         return True
-    if parsed.path and "playlist" in parsed.path:
-        return True
-    return False
+    return bool(parsed.path and "playlist" in parsed.path)
 
 
 def _validate_download_type(download_type: str) -> None:
@@ -57,7 +53,7 @@ def _validate_url(url: str) -> None:
         )
 
 
-def _row_to_dict(row: Any) -> Dict[str, Any]:
+def _row_to_dict(row: Any) -> dict[str, Any]:
     # sqlite3.Rowはdict-likeだがdictではないので、キーの存在チェックが必要
     keys = row.keys()
     return {
@@ -89,14 +85,14 @@ def _run_download_task(
     - 既存ファイルがある場合はスキップしてcompletedにする
     - プレイリストは事前バリデーションで弾かれている想定
     """
-    last_filename: Optional[str] = None
+    last_filename: str | None = None
 
     def _update_sql(query: str, params: tuple[Any, ...]) -> None:
         with get_connection() as conn_u:
             conn_u.execute(query, params)
             conn_u.commit()
 
-    # 1 並列ロックで囲む
+    # 並列ロックで囲む
     with _DOWNLOAD_LOCK:
         # downloading に遷移
         _update_sql(
@@ -105,7 +101,7 @@ def _run_download_task(
         )
         try:
             # 共通オプション
-            default_opts: Dict[str, Any] = {
+            default_opts: dict[str, Any] = {
                 "noplaylist": True,
                 "quiet": False,
                 "no_warnings": False,
@@ -128,7 +124,7 @@ def _run_download_task(
                 ]
 
             # ユーザー指定の追加パラメータを反映
-            user_opts: Dict[str, Any] = {}
+            user_opts: dict[str, Any] = {}
             if yt_dlp_params:
                 try:
                     extra_args = shlex.split(yt_dlp_params)
@@ -137,7 +133,7 @@ def _run_download_task(
                     raise HTTPException(
                         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                         detail=f"追加パラメータの解析に失敗しました: {e}",
-                    )
+                    ) from e
 
             # デフォルトオプションとユーザー指定オプションをマージ
             download_opts = dict(default_opts)
@@ -146,9 +142,7 @@ def _run_download_task(
             # メタ情報と期待されるファイル名を先に取得
             with YoutubeDL(download_opts) as ydl_probe:
                 info_probe = ydl_probe.extract_info(url, download=False)
-                title = (
-                    info_probe.get("title") if isinstance(info_probe, dict) else None
-                )
+                title = info_probe.get("title") if isinstance(info_probe, dict) else None
                 if title:
                     _update_sql(
                         "UPDATE downloads SET title = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
@@ -176,7 +170,7 @@ def _run_download_task(
                         pass
 
             # 進捗フック
-            def _hook(d: Dict[str, Any]) -> None:
+            def _hook(d: dict[str, Any]) -> None:
                 nonlocal last_filename
                 st = d.get("status")
                 if st == "downloading":
@@ -185,9 +179,7 @@ def _run_download_task(
                     progress = 0
                     if total:
                         try:
-                            progress = int(
-                                max(0, min(100, (downloaded * 100) // total))
-                            )
+                            progress = int(max(0, min(100, (downloaded * 100) // total)))
                         except Exception:
                             progress = 0
                     filename = d.get("filename") or last_filename
@@ -202,7 +194,7 @@ def _run_download_task(
                     if filename:
                         last_filename = filename
                         try:
-                            size = os.path.getsize(filename)
+                            size = Path(filename).stat().st_size
                         except OSError:
                             size = 0
                         # ファイルパスは最後にexpected_pathで上書きするので、ここではサイズと進捗のみ更新
@@ -221,7 +213,7 @@ def _run_download_task(
             # 完了（冪等に最終反映）
             path_str = str(expected_path)
             try:
-                size = os.path.getsize(path_str)
+                size = Path(path_str).stat().st_size
             except OSError:
                 size = 0
             _update_sql(

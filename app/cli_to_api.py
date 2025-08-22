@@ -1,8 +1,8 @@
 # ref: https://github.com/yt-dlp/yt-dlp/blob/master/devscripts/cli_to_api.py
-import os
+import pathlib
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, pathlib.Path(pathlib.Path(pathlib.Path(__file__).resolve()).parent).parent)
 
 import yt_dlp
 import yt_dlp.options
@@ -10,7 +10,7 @@ import yt_dlp.options
 create_parser = yt_dlp.options.create_parser
 
 
-def parse_patched_options(opts):
+def parse_patched_options(opts: list) -> yt_dlp.options.Namespace:
     patched_parser = create_parser()
     patched_parser.defaults.update(
         {
@@ -32,18 +32,12 @@ def parse_patched_options(opts):
 default_opts = parse_patched_options([]).ydl_opts
 
 
-def cli_to_api(opts, cli_defaults=False):
-    opts = (yt_dlp.parse_options if cli_defaults else parse_patched_options)(
-        opts
-    ).ydl_opts
+def cli_to_api(opts: list, cli_defaults: bool = False) -> dict:
+    opts = (yt_dlp.parse_options if cli_defaults else parse_patched_options)(opts).ydl_opts
 
     diff = {k: v for k, v in opts.items() if default_opts[k] != v}
     if "postprocessors" in diff:
-        diff["postprocessors"] = [
-            pp
-            for pp in diff["postprocessors"]
-            if pp not in default_opts["postprocessors"]
-        ]
+        diff["postprocessors"] = [pp for pp in diff["postprocessors"] if pp not in default_opts["postprocessors"]]
     return diff
 
 
