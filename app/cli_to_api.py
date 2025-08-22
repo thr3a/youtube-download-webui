@@ -10,7 +10,7 @@ import yt_dlp.options
 create_parser = yt_dlp.options.create_parser
 
 
-def parse_patched_options(opts: list) -> yt_dlp.options.Namespace:
+def parse_patched_options(opts: list):
     patched_parser = create_parser()
     patched_parser.defaults.update(
         {
