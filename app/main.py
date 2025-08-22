@@ -37,7 +37,6 @@ app = FastAPI(
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
-# 実装したDownloads API
 app.include_router(downloads_router)
 
 

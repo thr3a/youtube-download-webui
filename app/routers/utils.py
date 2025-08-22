@@ -16,11 +16,8 @@ from app.db import DOWNLOADS_DIR, get_connection
 _DOWNLOAD_LOCK = Lock()
 
 
+# シンプルなロジック、URLに「list=」クエリや「/playlist」パスが含まれている場合はプレイリストとみなす
 def _is_playlist_url(url: str) -> bool:
-    """Determine if the given url likely represents a playlist.
-
-    For now, we simply detect common patterns such as 'list=' query param or '/playlist' path.
-    """
     try:
         parsed = urlparse(url)
     except Exception:
@@ -55,6 +52,7 @@ def _validate_url(url: str) -> None:
 
 def _row_to_dict(row: Any) -> dict[str, Any]:
     # sqlite3.Rowはdict-likeだがdictではないので、キーの存在チェックが必要
+    # DBカラム追加時にKeyErrorを防ぐため、yt_dlp_paramsのみ存在チェック
     keys = row.keys()
     return {
         "id": row["id"],
@@ -92,15 +90,15 @@ def _run_download_task(
             conn_u.execute(query, params)
             conn_u.commit()
 
-    # 並列ロックで囲む
+    # 並列ロックで囲む（同時実行を防ぐ）
     with _DOWNLOAD_LOCK:
-        # downloading に遷移
+        # downloadingに変更
         _update_sql(
             "UPDATE downloads SET status = 'downloading', progress = 0, error_message = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
             (download_id,),
         )
         try:
-            # 共通オプション
+            # yt-dlpのデフォルトオプション
             default_opts: dict[str, Any] = {
                 "noplaylist": True,
                 "quiet": False,
@@ -127,6 +125,7 @@ def _run_download_task(
             user_opts: dict[str, Any] = {}
             if yt_dlp_params:
                 try:
+                    # 文字列をシェル引数として分割し、API用dictに変換
                     extra_args = shlex.split(yt_dlp_params)
                     user_opts = cli_to_api(extra_args)
                 except ValueError as e:
@@ -153,6 +152,7 @@ def _run_download_task(
             # 既にファイルが存在する場合の挙動
             if expected_path.exists():
                 if not force_redownload:
+                    # 強制再DLでなければスキップしてcompletedに
                     try:
                         size = expected_path.stat().st_size
                     except OSError:
@@ -171,9 +171,11 @@ def _run_download_task(
 
             # 進捗フック
             def _hook(d: dict[str, Any]) -> None:
+                # yt-dlpの進捗情報をDBに反映
                 nonlocal last_filename
                 st = d.get("status")
                 if st == "downloading":
+                    # ダウンロード中: 進捗率・ファイルサイズを更新
                     total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
                     downloaded = d.get("downloaded_bytes") or 0
                     progress = 0
@@ -190,6 +192,7 @@ def _run_download_task(
                         (int(progress), int(total or 0), download_id),
                     )
                 elif st == "finished":
+                    # ダウンロード完了: ファイルサイズ・進捗100%を更新
                     filename = d.get("filename") or last_filename
                     if filename:
                         last_filename = filename
@@ -210,7 +213,7 @@ def _run_download_task(
             with YoutubeDL(run_opts) as ydl_run:
                 ydl_run.extract_info(url, download=True)
 
-            # 完了（冪等に最終反映）
+            # 完了時にDBへ最終情報を反映
             path_str = str(expected_path)
             try:
                 size = Path(path_str).stat().st_size

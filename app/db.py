@@ -1,9 +1,3 @@
-"""SQLite database utilities for the YouTube download web UI.
-
-- DB file: ./webui.db (project root)
-- Table: downloads (created on startup if not exists)
-"""
-
 from __future__ import annotations
 
 import sqlite3
@@ -36,25 +30,15 @@ CREATE TABLE IF NOT EXISTS downloads (
 
 
 def get_connection() -> sqlite3.Connection:
-    """Create a SQLite3 connection with sane defaults.
-
-    Returns:
-        sqlite3.Connection: connection with Row factory and timeouts set.
-    """
     conn = sqlite3.connect(DB_PATH)
-    # Return rows as dict-like objects
     conn.row_factory = sqlite3.Row
-    # Avoid "database is locked" in light concurrent access
     conn.execute("PRAGMA busy_timeout = 5000;")
-    # Safer journaling mode for concurrent readers/writers
     conn.execute("PRAGMA journal_mode = WAL;")
-    # Enforce foreign keys (none yet, but good habit)
     conn.execute("PRAGMA foreign_keys = ON;")
     return conn
 
 
 async def init_db() -> None:  # noqa: RUF029
-    """Initialize the database schema if it does not exist."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
     with get_connection() as conn:
