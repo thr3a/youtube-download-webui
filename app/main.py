@@ -1,19 +1,48 @@
 from __future__ import annotations
 
+import os
+import secrets
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import HTMLResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .db import init_db
 from .routers.downloads import router as downloads_router
 
+security = HTTPBasic()
+
+
+async def verify_username(request: Request) -> HTTPBasicCredentials:
+    # 環境変数から認証情報を取得
+    env_username = os.getenv("USERNAME")
+    env_password = os.getenv("PASSWORD")
+
+    # 環境変数が設定されていない場合はエラー
+    if not env_username or not env_password:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="USERNAME or PASSWORD environment variable is not set",
+        )
+
+    credentials = await security(request)
+    correct_username = secrets.compare_digest(credentials.username, env_username)
+    correct_password = secrets.compare_digest(credentials.password, env_password)
+    if not (correct_username and correct_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect name or password",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username
+
 
 @asynccontextmanager
-async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
+async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
     """アプリ起動時にDBと保存先ディレクトリを初期化する。"""
     await init_db()
     yield
@@ -43,6 +72,8 @@ app.include_router(downloads_router)
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request) -> HTMLResponse:
     """トップページ: Jinja2テンプレートを返す。"""
+    # ベーシック認証を適用
+    await verify_username(request)
     return templates.TemplateResponse(
         name="index.html",
         context={"request": request},
