@@ -173,9 +173,11 @@ def download_file(download_id: int) -> StreamingResponse:
 
     filename = pathlib.Path(file_path).name
     encoded_filename = quote(filename)
+    file_size = row["file_size"]
     headers = {
         "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}",
         "Content-Type": "application/octet-stream",
+        "Content-Length": str(file_size),
     }
 
     return StreamingResponse(
