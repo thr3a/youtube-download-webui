@@ -84,6 +84,7 @@ def _run_download_task(
     - プレイリストは事前バリデーションで弾かれている想定
     """
     last_filename: str | None = None
+    final_path: str | None = None
 
     def _update_sql(query: str, params: tuple[Any, ...]) -> None:
         with get_connection() as conn_u:
@@ -206,22 +207,30 @@ def _run_download_task(
                             (int(size), download_id),
                         )
 
+            # ポストプロセッサフック
+            def _postprocessor_hook(d: dict[str, Any]) -> None:
+                nonlocal final_path
+                st = d.get("status")
+                if st == "finished":
+                    # ポストプロセッサ完了: 最終ファイル名を取得
+                    final_path = d.get("info_dict", {}).get("filepath")
+
             run_opts = dict(download_opts)
             run_opts["progress_hooks"] = [_hook]
+            run_opts["postprocessor_hooks"] = [_postprocessor_hook]
 
             # 実ダウンロード
             with YoutubeDL(run_opts) as ydl_run:
                 ydl_run.extract_info(url, download=True)
 
             # 完了時にDBへ最終情報を反映
-            path_str = str(expected_path)
             try:
-                size = Path(path_str).stat().st_size
+                size = Path(final_path).stat().st_size
             except OSError:
                 size = 0
             _update_sql(
                 "UPDATE downloads SET status = 'completed', file_path = ?, file_size = ?, progress = 100, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                (path_str, int(size), download_id),
+                (str(final_path), int(size), download_id),
             )
         except Exception as e:
             msg = str(e)
