@@ -1,4 +1,5 @@
 # ref: https://github.com/yt-dlp/yt-dlp/blob/master/devscripts/cli_to_api.py
+import argparse
 import pathlib
 import sys
 
@@ -10,18 +11,18 @@ import yt_dlp.options
 create_parser = yt_dlp.options.create_parser
 
 
-def parse_patched_options(opts: list):
+def parse_patched_options(opts: list) -> argparse.Namespace:
     patched_parser = create_parser()
-    patched_parser.defaults.update(
-        {
-            "ignoreerrors": False,
-            "retries": 0,
-            "fragment_retries": 0,
-            "extract_flat": False,
-            "concat_playlist": "never",
-            "update_self": False,
-        }
-    )
+    # patched_parser.defaults.update(
+    #     {
+    #         "ignoreerrors": False,
+    #         "retries": 0,
+    #         "fragment_retries": 0,
+    #         "extract_flat": False,
+    #         "concat_playlist": "never",
+    #         "update_self": False,
+    #     }
+    # )
     yt_dlp.options.create_parser = lambda: patched_parser
     try:
         return yt_dlp.parse_options(opts)
