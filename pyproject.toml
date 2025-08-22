@@ -36,34 +36,34 @@ select = [
     "W",   # pycodestyle warnings
 ]
 ignore = [
-    "RUF001", # ambiguous-unicode-character-string
-    "ANN401", # Checks that function arguments are annotated with a more specific type than Any.
-    "B007",   # Unused loop variable
-    "B008",   # Function call in default argument
-    "B905",   # `zip()` without `strict=True`
-    "COM812", # Missing trailing comma
-    "COM819", # Trailing comma prohibited
-    "D1",     # Missing docstring in public module, class, function, or method
-    "D203",   # One blank line required before class docstring (ignored because D211 is prioritized in pydocstyle convention 'google')
-    "D205",   # 1 blank line required between summary line and description
-    "D212",   # Multi-line docstring summary should start at the first line
-    "D213",   # Multi-line docstring summary should start at the second line
-    "D400",   # First line of docstring should end with a period
-    "D415",   # First line of docstring should end with punctuation (period, question mark, or exclamation point)
-    "E114",   # Indentation is not a multiple of four (comment)
-    "G004",   # Logging statement uses f-string
-    "ISC001", # Implicit string concatenation on a single line
-    "ISC002", # Implicit string concatenation on multiple lines
-    "PTH123", # `open()` should be replaced by `Path.open()`
-    "Q000",   # Single quotes found when double quotes are preferred
-    "Q001",   # Single quotes found when double quotes are preferred for multi-line strings
-    "Q002",   # Single quotes found when double quotes are preferred for docstrings
-    "RUF002", # Checks for ambiguous Unicode characters in docstrings.
-    "RUF003", # Checks for ambiguous Unicode characters in comments.
-    "SIM105", # try-except-pass blocks that can be replaced with the contextlib.suppress context manager.
-    "SIM108", # Use ternary operator instead of `if`-`else`-block
-    "SIM116", # Use a dictionary instead of consecutive `if` statements
-    "UP038",  # (Deprecated) Use `X | Y` in `isinstance` call instead of `(X, Y)`
+    "RUF001", # 文字列内の曖昧なUnicode文字を許容
+    "ANN401", # 関数引数の型アノテーションがAnyでも許容
+    "B007",   # ループ変数の未使用を許容
+    "B008",   # デフォルト引数での関数呼び出しを許容
+    "B905",   # strict=Trueなしのzip()使用を許容
+    "COM812", # カンマの付け忘れを許容
+    "COM819", # カンマ禁止違反を許容
+    "D1",     # 公開モジュール・クラス・関数・メソッドのdocstring省略を許容
+    "D203",   # クラスdocstring前の空行数（GoogleスタイルではD211優先のため無視）
+    "D205",   # docstringの要約行と説明の間の空行数を無視
+    "D212",   # 複数行docstringの要約行の位置（1行目開始）を無視
+    "D213",   # 複数行docstringの要約行の位置（2行目開始）を無視
+    "D400",   # docstringの1行目の末尾ピリオドを無視
+    "D415",   # docstringの1行目の末尾句読点（ピリオド等）を無視
+    "E114",   # コメント行のインデントが4の倍数でない場合を許容
+    "G004",   # ログ出力でのf-string使用を許容
+    "ISC001", # 1行での暗黙的な文字列連結を許容
+    "ISC002", # 複数行での暗黙的な文字列連結を許容
+    "PTH123", # open()のPath.open()置き換えを強制しない
+    # "Q000",   # シングルクォート使用を許容（ダブルクォート推奨違反）
+    "Q001",   # 複数行文字列でのシングルクォート使用を許容
+    "Q002",   # docstringでのシングルクォート使用を許容
+    "RUF002", # docstring内の曖昧なUnicode文字を許容
+    "RUF003", # コメント内の曖昧なUnicode文字を許容
+    "SIM105", # try-except-passをcontextlib.suppressで置き換えなくても許容
+    "SIM108", # if-elseブロックを三項演算子にしなくても許容
+    "SIM116", # 連続したif文を辞書にしなくても許容
+    "UP038",  # isinstanceの(X, Y)をX | Yにしなくても許容（非推奨）
 ]
 unfixable = [
     "F401", # unused import
