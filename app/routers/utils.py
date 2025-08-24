@@ -28,7 +28,7 @@ def _is_playlist_url(url: str) -> bool:
     return bool(parsed.path and "playlist" in parsed.path)
 
 
-def _validate_download_type(download_type: str) -> None:
+def validate_download_type(download_type: str) -> None:
     if download_type not in {"video", "audio"}:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -36,7 +36,7 @@ def _validate_download_type(download_type: str) -> None:
         )
 
 
-def _validate_url(url: str) -> None:
+def validate_url(url: str) -> None:
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise HTTPException(
@@ -50,7 +50,7 @@ def _validate_url(url: str) -> None:
         )
 
 
-def _row_to_dict(row: Any) -> dict[str, Any]:
+def row_to_dict(row: Any) -> dict[str, Any]:
     # sqlite3.Rowはdict-likeだがdictではないので、キーの存在チェックが必要
     # DBカラム追加時にKeyErrorを防ぐため、yt_dlp_paramsのみ存在チェック
     keys = row.keys()
@@ -70,7 +70,7 @@ def _row_to_dict(row: Any) -> dict[str, Any]:
     }
 
 
-def _run_download_task(
+def run_download_task(
     download_id: int,
     url: str,
     download_type: str,

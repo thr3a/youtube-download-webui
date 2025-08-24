@@ -10,10 +10,10 @@ from pydantic import BaseModel, Field
 
 from app.db import get_connection
 from app.routers.utils import (
-    _row_to_dict,
-    _run_download_task,
-    _validate_download_type,
-    _validate_url,
+    row_to_dict,
+    run_download_task,
+    validate_download_type,
+    validate_url,
 )
 
 
@@ -99,7 +99,7 @@ def list_downloads() -> list[dict[str, Any]]:
         rows = conn.execute(
             "SELECT * FROM downloads ORDER BY id DESC",
         ).fetchall()
-    return [_row_to_dict(r) for r in rows]
+    return [row_to_dict(r) for r in rows]
 
 
 @router.get(
@@ -121,7 +121,7 @@ def get_download(download_id: int) -> dict[str, Any]:
         ).fetchone()
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
-    return _row_to_dict(row)
+    return row_to_dict(row)
 
 
 def _file_iterator(file_path: str, chunk_size: int = 8192) -> iter[bytes]:
@@ -241,7 +241,7 @@ def retry_download(download_id: int, background_tasks: BackgroundTasks) -> dict[
 
         # バックグラウンド実行（強制再ダウンロード）
         background_tasks.add_task(
-            _run_download_task,
+            run_download_task,
             download_id,
             row["url"],
             row["download_type"],
@@ -254,7 +254,7 @@ def retry_download(download_id: int, background_tasks: BackgroundTasks) -> dict[
             (download_id,),
         ).fetchone()
 
-    return _row_to_dict(row2)
+    return row_to_dict(row2)
 
 
 @router.post(
@@ -293,8 +293,8 @@ def create_download(payload: CreateDownloadRequest, background_tasks: Background
             detail="download_type は必須です。",
         )
 
-    _validate_url(url)
-    _validate_download_type(download_type)
+    validate_url(url)
+    validate_download_type(download_type)
 
     with get_connection() as conn:
         cur = conn.execute(
@@ -313,6 +313,6 @@ def create_download(payload: CreateDownloadRequest, background_tasks: Background
         ).fetchone()
 
     # バックグラウンドで実処理をキュー（ロックにより1並列実行）
-    background_tasks.add_task(_run_download_task, new_id, url, download_type, False, yt_dlp_params)
+    background_tasks.add_task(run_download_task, new_id, url, download_type, False, yt_dlp_params)
 
-    return _row_to_dict(row)
+    return row_to_dict(row)
