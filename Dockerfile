@@ -31,4 +31,5 @@ COPY . /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked
 
-CMD ["/app/.venv/bin/fastapi", "run", "app/main.py", "--port", "3000"]
+# CMD ["/app/.venv/bin/fastapi", "run", "app/main.py", "--port", "3000"]
+CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "3000"]
