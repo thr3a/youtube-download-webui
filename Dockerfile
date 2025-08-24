@@ -9,7 +9,7 @@ ENV PIP_NO_CACHE_DIR=on
 ENV PYTHONDONTWRITEBYTECODE=1
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl ffmpeg ca-certificates crontab && \
+    apt-get install -y --no-install-recommends curl ffmpeg ca-certificates cron && \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
