@@ -8,6 +8,11 @@ image: thr3a/youtube-download-webui
 servers:
   web:
     - ubuntu02.local
+  cron:
+    hosts:
+      - ubuntu02.local
+    cmd: bash -c "(env && cat config/crontab) | crontab - && cron -f"
+
   # job:
   #   hosts:
   #     - 192.168.0.1
