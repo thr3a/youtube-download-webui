@@ -1,1 +1,1 @@
-* * * * * PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; /bin/date >> /tmp/cronlog && /bin/mkdir /tmp/hoge
+* * * * * bash -c "date >> /tmp/cronlog && mkdir /tmp/hoge"
