@@ -4,6 +4,8 @@ service: youtube-download-webui
 # Name of the container image.
 image: thr3a/youtube-download-webui
 
+drain_timeout: 10
+
 # Deploy to these servers.
 servers:
   web:
