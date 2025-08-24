@@ -10,10 +10,10 @@ drain_timeout: 10
 servers:
   web:
     - ubuntu02.local
-  cron:
-    hosts:
-      - ubuntu02.local
-    cmd: bash -c "(env && cat config/crontab) | crontab - && cron -f"
+  # cron:
+  #   hosts:
+  #     - ubuntu02.local
+  #   cmd: bash -c "(env && cat config/crontab) | crontab - && cron -f"
 
   # job:
   #   hosts:
