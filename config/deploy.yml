@@ -9,7 +9,7 @@ drain_timeout: 10
 # Deploy to these servers.
 servers:
   web:
-    - ubuntu02.local
+    - deep01.local
   # cron:
   #   hosts:
   #     - ubuntu02.local
