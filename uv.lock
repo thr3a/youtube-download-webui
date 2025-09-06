@@ -993,11 +993,11 @@ requires-dist = [
 
 [[package]]
 name = "yt-dlp"
-version = "2025.8.28.232853.dev0"
+version = "2025.9.5.224711.dev0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/06/fb/fbc324a74456f8f6893ceca1faa001397531965b81f31d82bf0bd3b5f49a/yt_dlp-2025.8.28.232853.dev0.tar.gz", hash = "sha256:fe3511b1d93e886da636375f2c22886c60d63489808366e9f2f6780e1724a2f4", size = 3039317, upload-time = "2025-08-28T23:35:50.751Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9a/db/ae696ad84729d5c23d78b79ec2c662203198e37301ae7bfca0a1bf31e95c/yt_dlp-2025.9.5.224711.dev0.tar.gz", hash = "sha256:c53351214a9183743a629cc5f2f4f0a8ff1ca3ba401470aa146a1b62952249ea", size = 3046576, upload-time = "2025-09-05T22:52:01.512Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4a/56/5a405ff4efc93ec8cdb8351bdd741c6cd2d109234a9cef02c11114289404/yt_dlp-2025.8.28.232853.dev0-py3-none-any.whl", hash = "sha256:852347127fe0481f817371f5fa6c0568d817cbe883f831d5f451b39126211768", size = 3267859, upload-time = "2025-08-28T23:35:48.091Z" },
+    { url = "https://files.pythonhosted.org/packages/e0/c1/af650198ffccc4606592e2e69ff972d2de49b8c2264d663d697ed1a9f3e2/yt_dlp-2025.9.5.224711.dev0-py3-none-any.whl", hash = "sha256:da2be96d2d98be4aeef97e31d63aa8f28e25c19b6ae065bb606a8d049ff3b987", size = 3272627, upload-time = "2025-09-05T22:51:58.901Z" },
 ]
 
 [package.optional-dependencies]
