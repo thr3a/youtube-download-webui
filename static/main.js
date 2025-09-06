@@ -175,6 +175,21 @@ $("#startBtn").addEventListener("click", async () => {
   }
 });
 
+// 偽装ボタン
+const impersonateBtn = document.getElementById("impersonateBtn");
+if (impersonateBtn) {
+  impersonateBtn.addEventListener("click", () => {
+    const input = document.getElementById("ytDlpParams");
+    if (!input) return;
+    const flag = "--impersonate chrome:windows-10";
+    const current = (input.value || "").trim();
+    if (!current.includes(flag)) {
+      input.value = current ? current + " " + flag : flag;
+    }
+    input.focus();
+  });
+}
+
 // 初期表示とポーリング（進捗や状態の自動更新のため）
 fetchHistory();
 setInterval(fetchHistory, 2000);
